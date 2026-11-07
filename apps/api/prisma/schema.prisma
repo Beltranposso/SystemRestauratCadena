@@ -1,0 +1,690 @@
+// Sistema Multi-Sede de Restaurantes — modelo de datos
+// Convención: modelos y campos en camelCase (TypeScript); tablas y columnas en snake_case (BD).
+// Montos: DECIMAL(12,2). Fechas-hora: UTC (timestamptz). Fechas de operación: DATE en hora local de la sede.
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────── Enums ───────────────────────────────
+
+enum RolUsuario {
+  ADMIN_GLOBAL
+  GERENTE_PAIS
+  GERENTE_SEDE
+  CAJERO
+  COCINA
+}
+
+enum TipoDispositivo {
+  PANTALLA
+  KIOSCO
+}
+
+enum CanalPedido {
+  CAJA
+  KIOSCO
+  WEB
+}
+
+enum EstadoPedido {
+  RECIBIDO
+  EN_PREPARACION
+  LISTO
+  ENTREGADO
+  CANCELADO
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+}
+
+enum TipoPromocion {
+  /// % de descuento sobre un producto o una categoría
+  PORCENTAJE
+  /// Precio especial para un producto o combo (moneda local)
+  PRECIO_FIJO
+  /// Lleva N, paga M (2x1, 3x2…) en un producto
+  LLEVA_PAGA
+}
+
+enum TipoSecuencia {
+  PEDIDO
+  ESPERA
+}
+
+enum PuestoTurno {
+  CAJA
+  COCINA
+  SERVICIO
+  GERENCIA
+}
+
+enum EstadoTurno {
+  PROGRAMADO
+  EN_CURSO
+  COMPLETADO
+  AUSENTE
+}
+
+enum FormaMesa {
+  REDONDA
+  CUADRADA
+  RECTANGULAR
+}
+
+enum EstadoMesa {
+  LIBRE
+  RESERVADA
+  OCUPADA
+  LIMPIEZA
+  FUERA_SERVICIO
+}
+
+enum EstadoReserva {
+  PENDIENTE
+  CONFIRMADA
+  SENTADA
+  COMPLETADA
+  CANCELADA
+  NO_SHOW
+}
+
+enum EstadoEspera {
+  ESPERANDO
+  NOTIFICADO
+  SENTADO
+  ABANDONO
+}
+
+enum OrigenSesion {
+  RESERVA
+  ESPERA
+  DIRECTO
+}
+
+enum CanalNotificacion {
+  EN_APP
+  EMAIL
+}
+
+enum TipoNotificacion {
+  CONFIRMACION_RESERVA
+  CAMBIO_RESERVA
+  MESA_LISTA
+  RECORDATORIO
+}
+
+enum EstadoNotificacion {
+  PENDIENTE
+  ENVIADA
+  FALLIDA
+}
+
+// ───────────────────────────── Geografía ─────────────────────────────
+
+model Pais {
+  id           Int      @id @default(autoincrement())
+  codigoIso    String   @unique @map("codigo_iso") @db.Char(2)
+  nombre       String   @db.VarChar(80)
+  moneda       String   @db.Char(3)
+  /// Unidades de moneda local por 1 USD (ej. COP 4000). Se congela en cada pedido como total_usd.
+  tasaUsd      Decimal  @map("tasa_usd") @db.Decimal(18, 6)
+  /// Impuesto al consumo aplicado sobre el subtotal (0.0800 = 8 %).
+  tasaImpuesto Decimal  @map("tasa_impuesto") @db.Decimal(5, 4)
+  creadoEn     DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  ciudades Ciudad[]
+  usuarios Usuario[]
+
+  @@map("paises")
+}
+
+model Ciudad {
+  id     Int    @id @default(autoincrement())
+  paisId Int    @map("pais_id")
+  nombre String @db.VarChar(80)
+
+  pais  Pais   @relation(fields: [paisId], references: [id], onDelete: Restrict)
+  sedes Sede[]
+
+  @@unique([paisId, nombre])
+  @@map("ciudades")
+}
+
+model Sede {
+  id                      Int      @id @default(autoincrement())
+  ciudadId                Int      @map("ciudad_id")
+  codigo                  String   @unique @db.VarChar(12)
+  nombre                  String   @db.VarChar(120)
+  direccion               String   @db.VarChar(200)
+  /// Zona horaria IANA, ej. America/Bogota
+  zonaHoraria             String   @map("zona_horaria") @db.VarChar(64)
+  /// Letra que antecede el número del pedido en pantalla (A-042)
+  prefijoPedido           String   @map("prefijo_pedido") @db.VarChar(3)
+  /// Horario del salón para reservas y cola, en hora local "HH:mm"
+  horaApertura            String   @default("12:00") @map("hora_apertura") @db.VarChar(5)
+  horaCierre              String   @default("22:30") @map("hora_cierre") @db.VarChar(5)
+  duracionReservaMin      Int      @default(90) @map("duracion_reserva_min")
+  horasMinimasCancelacion Int      @default(2) @map("horas_minimas_cancelacion")
+  /// Cuántos kioscos de autoservicio y pantallas de pedidos puede tener activos la sede (los fija el gerente de país)
+  cupoKioscos             Int      @default(1) @map("cupo_kioscos")
+  cupoPantallas           Int      @default(1) @map("cupo_pantallas")
+  activa                  Boolean  @default(true)
+  creadoEn                DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  ciudad         Ciudad            @relation(fields: [ciudadId], references: [id], onDelete: Restrict)
+  usuarios       Usuario[]
+  dispositivos   Dispositivo[]
+  productos      ProductoSede[]
+  pedidos        Pedido[]
+  secuencias     SecuenciaPedido[]
+  turnos         Turno[]
+  mesas          Mesa[]
+  reservas       Reserva[]
+  entradasEspera EntradaEspera[]
+  calificaciones Calificacion[]
+  promociones    PromocionSede[]
+
+  @@index([ciudadId])
+  @@map("sedes")
+}
+
+// ───────────────────────── Personas y acceso ─────────────────────────
+
+/// Personal de la cadena. El alcance lo dan pais_id (gerente de país) o sede_id (gerente de sede, cajero, cocina).
+model Usuario {
+  id           String     @id @default(uuid()) @db.Uuid
+  nombre       String     @db.VarChar(120)
+  email        String     @unique @db.VarChar(160)
+  passwordHash String     @map("password_hash") @db.VarChar(100)
+  rol          RolUsuario
+  paisId       Int?       @map("pais_id")
+  sedeId       Int?       @map("sede_id")
+  activo       Boolean    @default(true)
+  creadoEn     DateTime   @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  pais          Pais?                   @relation(fields: [paisId], references: [id], onDelete: Restrict)
+  sede          Sede?                   @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  refreshTokens RefreshToken[]
+  pedidosCaja   Pedido[]
+  cambiosPedido PedidoEstadoHistorial[]
+  turnos        Turno[]
+
+  @@index([sedeId, rol])
+  @@map("usuarios")
+}
+
+/// Comensales con cuenta propia (portal de reservas). Separados del personal.
+model Cliente {
+  id           String   @id @default(uuid()) @db.Uuid
+  nombre       String   @db.VarChar(120)
+  email        String   @unique @db.VarChar(160)
+  telefono     String   @db.VarChar(20)
+  passwordHash String   @map("password_hash") @db.VarChar(100)
+  creadoEn     DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  refreshTokens  RefreshToken[]
+  reservas       Reserva[]
+  entradasEspera EntradaEspera[]
+  notificaciones Notificacion[]
+  calificaciones Calificacion[]
+
+  @@map("clientes")
+}
+
+/// Refresh tokens rotativos. Pertenece a un usuario O a un cliente (CHECK en la migración).
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  usuarioId  String?   @map("usuario_id") @db.Uuid
+  clienteId  String?   @map("cliente_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(128)
+  expiraEn   DateTime  @map("expira_en") @db.Timestamptz(3)
+  revocadoEn DateTime? @map("revocado_en") @db.Timestamptz(3)
+  creadoEn   DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([clienteId])
+  @@map("refresh_tokens")
+}
+
+/// Pantallas y kioscos de una sede. Se autentican con un token de dispositivo (se guarda solo su hash).
+model Dispositivo {
+  id               String          @id @default(uuid()) @db.Uuid
+  sedeId           Int             @map("sede_id")
+  nombre           String          @db.VarChar(80)
+  tipo             TipoDispositivo
+  tokenHash        String          @unique @map("token_hash") @db.VarChar(128)
+  activo           Boolean         @default(true)
+  /// Última petición del equipo (se actualiza como máximo una vez por minuto)
+  ultimaConexionEn DateTime?       @map("ultima_conexion_en") @db.Timestamptz(3)
+  creadoEn         DateTime        @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  sede Sede @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  @@index([sedeId])
+  @@map("dispositivos")
+}
+
+// ───────────────────────────── Catálogo ──────────────────────────────
+
+model Categoria {
+  id     Int    @id @default(autoincrement())
+  nombre String @unique @db.VarChar(60)
+  orden  Int    @default(0)
+  icono  String @db.VarChar(40)
+
+  productos   Producto[]
+  promociones Promocion[]
+
+  @@map("categorias")
+}
+
+/// Catálogo global. Un producto aparece en una sede solo si tiene fila en productos_sede.
+model Producto {
+  id          Int      @id @default(autoincrement())
+  categoriaId Int      @map("categoria_id")
+  sku         String   @unique @db.VarChar(30)
+  nombre      String   @db.VarChar(120)
+  descripcion String   @db.VarChar(300)
+  imagenUrl   String?  @map("imagen_url") @db.VarChar(300)
+  /// Un combo es un producto con contenido fijo (ver combo_componentes)
+  esCombo     Boolean  @default(false) @map("es_combo")
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  categoria   Categoria         @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+  sedes       ProductoSede[]
+  items       PedidoItem[]
+  componentes ComboComponente[] @relation("combo")
+  enCombos    ComboComponente[] @relation("componente")
+  promociones Promocion[]
+
+  @@index([categoriaId])
+  @@map("productos")
+}
+
+/// Menú de cada sede: precio en moneda local y disponibilidad.
+model ProductoSede {
+  sedeId     Int     @map("sede_id")
+  productoId Int     @map("producto_id")
+  precio     Decimal @db.Decimal(12, 2)
+  disponible Boolean @default(true)
+  orden      Int?
+
+  sede     Sede     @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@id([sedeId, productoId])
+  @@index([productoId])
+  @@map("productos_sede")
+}
+
+/// Contenido fijo de un combo: qué productos y cuántos de cada uno.
+model ComboComponente {
+  comboId    Int @map("combo_id")
+  productoId Int @map("producto_id")
+  cantidad   Int @default(1)
+
+  combo    Producto @relation("combo", fields: [comboId], references: [id], onDelete: Cascade)
+  producto Producto @relation("componente", fields: [productoId], references: [id], onDelete: Restrict)
+
+  @@id([comboId, productoId])
+  @@index([productoId])
+  @@map("combo_componentes")
+}
+
+/// Promociones de la casa matriz. Aplican en las sedes elegidas, dentro de su vigencia,
+/// días y franja horaria (hora local de cada sede). Nunca se acumulan: por línea gana la que más descuenta.
+model Promocion {
+  id             Int           @id @default(autoincrement())
+  nombre         String        @db.VarChar(80)
+  descripcion    String        @default("") @db.VarChar(200)
+  tipo           TipoPromocion
+  /// Producto o combo al que aplica (obligatorio salvo en PORCENTAJE por categoría)
+  productoId     Int?          @map("producto_id")
+  categoriaId    Int?          @map("categoria_id")
+  porcentaje     Decimal?      @db.Decimal(5, 2)
+  precioEspecial Decimal?      @map("precio_especial") @db.Decimal(12, 2)
+  llevaN         Int?          @map("lleva_n")
+  pagaM          Int?          @map("paga_m")
+  /// Vigencia en fechas locales; fecha_fin nula = sin fin
+  fechaInicio    DateTime      @map("fecha_inicio") @db.Date
+  fechaFin       DateTime?     @map("fecha_fin") @db.Date
+  /// 0 = domingo … 6 = sábado. Vacío = todos los días
+  diasSemana     Int[]         @default([]) @map("dias_semana")
+  horaInicio     String?       @map("hora_inicio") @db.VarChar(5)
+  horaFin        String?       @map("hora_fin") @db.VarChar(5)
+  activa         Boolean       @default(true)
+  creadoEn       DateTime      @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  producto  Producto?       @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  categoria Categoria?      @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  sedes     PromocionSede[]
+  items     PedidoItem[]
+
+  @@map("promociones")
+}
+
+model PromocionSede {
+  promocionId Int @map("promocion_id")
+  sedeId      Int @map("sede_id")
+
+  promocion Promocion @relation(fields: [promocionId], references: [id], onDelete: Cascade)
+  sede      Sede      @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  @@id([promocionId, sedeId])
+  @@index([sedeId])
+  @@map("promociones_sede")
+}
+
+// ────────────────────────────── Pedidos ──────────────────────────────
+
+model Pedido {
+  id             String       @id @default(uuid()) @db.Uuid
+  sedeId         Int          @map("sede_id")
+  /// Día de operación en la hora local de la sede (reinicia la numeración)
+  fechaOperacion DateTime     @map("fecha_operacion") @db.Date
+  numeroDia      Int          @map("numero_dia")
+  /// Código visible para el cliente, ej. A-042
+  codigo         String       @db.VarChar(12)
+  canal          CanalPedido
+  estado         EstadoPedido @default(RECIBIDO)
+  clienteNombre  String?      @map("cliente_nombre") @db.VarChar(80)
+  cajeroId       String?      @map("cajero_id") @db.Uuid
+  mesaId         Int?         @map("mesa_id")
+  /// Subtotal ya con descuentos (base del impuesto)
+  subtotal       Decimal      @db.Decimal(12, 2)
+  /// Suma de descuentos por promociones
+  descuento      Decimal      @default(0) @db.Decimal(12, 2)
+  impuestos      Decimal      @db.Decimal(12, 2)
+  total          Decimal      @db.Decimal(12, 2)
+  moneda         String       @db.Char(3)
+  /// Total convertido a USD con la tasa vigente al momento de la venta
+  totalUsd       Decimal      @map("total_usd") @db.Decimal(12, 2)
+  metodoPago     MetodoPago   @map("metodo_pago")
+  creadoEn       DateTime     @default(now()) @map("creado_en") @db.Timestamptz(3)
+  listoEn        DateTime?    @map("listo_en") @db.Timestamptz(3)
+  entregadoEn    DateTime?    @map("entregado_en") @db.Timestamptz(3)
+
+  sede           Sede                    @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  cajero         Usuario?                @relation(fields: [cajeroId], references: [id], onDelete: SetNull)
+  mesa           Mesa?                   @relation(fields: [mesaId], references: [id], onDelete: SetNull)
+  items          PedidoItem[]
+  historial      PedidoEstadoHistorial[]
+  calificaciones Calificacion[]
+
+  @@unique([sedeId, fechaOperacion, numeroDia])
+  @@index([sedeId, creadoEn])
+  @@index([estado, sedeId])
+  @@index([creadoEn])
+  @@map("pedidos")
+}
+
+model PedidoItem {
+  id              String  @id @default(uuid()) @db.Uuid
+  pedidoId        String  @map("pedido_id") @db.Uuid
+  productoId      Int     @map("producto_id")
+  /// Copia del nombre y precio al momento de la venta: cambios de menú no alteran ventas pasadas
+  nombreProducto  String  @map("nombre_producto") @db.VarChar(120)
+  cantidad        Int
+  precioUnitario  Decimal @map("precio_unitario") @db.Decimal(12, 2)
+  /// Descuento de la línea por promoción
+  descuento       Decimal @default(0) @db.Decimal(12, 2)
+  /// precio_unitario × cantidad − descuento
+  subtotal        Decimal @db.Decimal(12, 2)
+  notas           String? @db.VarChar(200)
+  promocionId     Int?    @map("promocion_id")
+  /// Copia del nombre de la promoción aplicada
+  promocionNombre String? @map("promocion_nombre") @db.VarChar(80)
+  /// Copia del contenido del combo para cocina: [{ nombre, cantidad }]
+  componentes     Json?
+
+  pedido    Pedido     @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  producto  Producto   @relation(fields: [productoId], references: [id], onDelete: Restrict)
+  promocion Promocion? @relation(fields: [promocionId], references: [id], onDelete: SetNull)
+
+  @@index([pedidoId])
+  @@index([productoId])
+  @@map("pedido_items")
+}
+
+/// Bitácora de cambios de estado: base de los tiempos de cocina.
+model PedidoEstadoHistorial {
+  id           String       @id @default(uuid()) @db.Uuid
+  pedidoId     String       @map("pedido_id") @db.Uuid
+  estado       EstadoPedido
+  usuarioId    String?      @map("usuario_id") @db.Uuid
+  registradoEn DateTime     @default(now()) @map("registrado_en") @db.Timestamptz(3)
+
+  pedido  Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([pedidoId, registradoEn])
+  @@map("pedido_estado_historial")
+}
+
+/// Consecutivos diarios por sede (pedidos y turnos de la cola de espera).
+/// Se incrementa con un único INSERT ... ON CONFLICT DO UPDATE ... RETURNING (ver src/db/secuencias.ts).
+model SecuenciaPedido {
+  sedeId         Int           @map("sede_id")
+  fechaOperacion DateTime      @map("fecha_operacion") @db.Date
+  tipo           TipoSecuencia @default(PEDIDO)
+  ultimoNumero   Int           @default(0) @map("ultimo_numero")
+
+  sede Sede @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  @@id([sedeId, fechaOperacion, tipo])
+  @@map("secuencias_pedido")
+}
+
+// ────────────────────────────── Turnos ───────────────────────────────
+
+/// Turnos de trabajo del personal (no confundir con EntradaEspera, la cola de clientes).
+model Turno {
+  id          String      @id @default(uuid()) @db.Uuid
+  sedeId      Int         @map("sede_id")
+  usuarioId   String      @map("usuario_id") @db.Uuid
+  puesto      PuestoTurno
+  inicio      DateTime    @db.Timestamptz(3)
+  fin         DateTime    @db.Timestamptz(3)
+  estado      EstadoTurno @default(PROGRAMADO)
+  entradaReal DateTime?   @map("entrada_real") @db.Timestamptz(3)
+  salidaReal  DateTime?   @map("salida_real") @db.Timestamptz(3)
+  notas       String?     @db.VarChar(200)
+  creadoEn    DateTime    @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  sede    Sede    @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([sedeId, inicio])
+  @@index([usuarioId, inicio])
+  @@map("turnos")
+}
+
+// ───────────────────────── Mesas y reservas ──────────────────────────
+
+/// Mesa del salón. pos_x/pos_y/ancho/alto en unidades del plano (lienzo de 1000 × 700).
+model Mesa {
+  id        Int        @id @default(autoincrement())
+  sedeId    Int        @map("sede_id")
+  codigo    String     @db.VarChar(10)
+  capacidad Int
+  zona      String     @db.VarChar(40)
+  forma     FormaMesa
+  posX      Int        @map("pos_x")
+  posY      Int        @map("pos_y")
+  ancho     Int
+  alto      Int
+  rotacion  Int        @default(0)
+  estado    EstadoMesa @default(LIBRE)
+  activa    Boolean    @default(true)
+
+  sede           Sede            @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  reservas       Reserva[]
+  sesiones       SesionMesa[]
+  entradasEspera EntradaEspera[]
+  pedidos        Pedido[]
+
+  @@unique([sedeId, codigo])
+  @@index([sedeId, estado])
+  @@map("mesas")
+}
+
+model Reserva {
+  id                 String        @id @default(uuid()) @db.Uuid
+  sedeId             Int           @map("sede_id")
+  clienteId          String        @map("cliente_id") @db.Uuid
+  mesaId             Int?          @map("mesa_id")
+  inicio             DateTime      @db.Timestamptz(3)
+  duracionMin        Int           @map("duracion_min")
+  personas           Int
+  estado             EstadoReserva @default(PENDIENTE)
+  codigoConfirmacion String        @unique @map("codigo_confirmacion") @db.VarChar(10)
+  notas              String?       @db.VarChar(300)
+  creadoEn           DateTime      @default(now()) @map("creado_en") @db.Timestamptz(3)
+  canceladaEn        DateTime?     @map("cancelada_en") @db.Timestamptz(3)
+
+  sede           Sede           @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  cliente        Cliente        @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  mesa           Mesa?          @relation(fields: [mesaId], references: [id], onDelete: SetNull)
+  sesiones       SesionMesa[]
+  notificaciones Notificacion[]
+  calificaciones Calificacion[]
+
+  @@index([sedeId, inicio])
+  @@index([mesaId, inicio])
+  @@index([clienteId, inicio])
+  @@map("reservas")
+}
+
+/// Cola de espera para clientes sin reserva (el "turno" del comensal).
+model EntradaEspera {
+  id             String       @id @default(uuid()) @db.Uuid
+  sedeId         Int          @map("sede_id")
+  clienteId      String?      @map("cliente_id") @db.Uuid
+  nombre         String       @db.VarChar(80)
+  telefono       String       @db.VarChar(20)
+  personas       Int
+  fechaOperacion DateTime     @map("fecha_operacion") @db.Date
+  numeroTurno    Int          @map("numero_turno")
+  estado         EstadoEspera @default(ESPERANDO)
+  mesaId         Int?         @map("mesa_id")
+  creadoEn       DateTime     @default(now()) @map("creado_en") @db.Timestamptz(3)
+  notificadoEn   DateTime?    @map("notificado_en") @db.Timestamptz(3)
+  sentadoEn      DateTime?    @map("sentado_en") @db.Timestamptz(3)
+
+  sede           Sede           @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  cliente        Cliente?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  mesa           Mesa?          @relation(fields: [mesaId], references: [id], onDelete: SetNull)
+  sesiones       SesionMesa[]
+  notificaciones Notificacion[]
+
+  @@unique([sedeId, fechaOperacion, numeroTurno])
+  @@index([sedeId, estado])
+  @@map("entradas_espera")
+}
+
+/// Cada vez que una mesa se ocupa. Base de los reportes de ocupación y rotación.
+model SesionMesa {
+  id              String       @id @default(uuid()) @db.Uuid
+  mesaId          Int          @map("mesa_id")
+  origen          OrigenSesion
+  reservaId       String?      @map("reserva_id") @db.Uuid
+  entradaEsperaId String?      @map("entrada_espera_id") @db.Uuid
+  personas        Int
+  inicio          DateTime     @db.Timestamptz(3)
+  fin             DateTime?    @db.Timestamptz(3)
+
+  mesa          Mesa           @relation(fields: [mesaId], references: [id], onDelete: Cascade)
+  reserva       Reserva?       @relation(fields: [reservaId], references: [id], onDelete: SetNull)
+  entradaEspera EntradaEspera? @relation(fields: [entradaEsperaId], references: [id], onDelete: SetNull)
+
+  @@index([mesaId, inicio])
+  @@index([inicio])
+  @@map("sesiones_mesa")
+}
+
+model Notificacion {
+  id              String             @id @default(uuid()) @db.Uuid
+  clienteId       String?            @map("cliente_id") @db.Uuid
+  /// Email o identificador de destino
+  destino         String             @db.VarChar(160)
+  canal           CanalNotificacion
+  tipo            TipoNotificacion
+  reservaId       String?            @map("reserva_id") @db.Uuid
+  entradaEsperaId String?            @map("entrada_espera_id") @db.Uuid
+  estado          EstadoNotificacion @default(PENDIENTE)
+  creadoEn        DateTime           @default(now()) @map("creado_en") @db.Timestamptz(3)
+  enviadaEn       DateTime?          @map("enviada_en") @db.Timestamptz(3)
+
+  cliente       Cliente?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  reserva       Reserva?       @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  entradaEspera EntradaEspera? @relation(fields: [entradaEsperaId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId, creadoEn])
+  @@index([estado])
+  @@map("notificaciones")
+}
+
+model Calificacion {
+  id         String   @id @default(uuid()) @db.Uuid
+  sedeId     Int      @map("sede_id")
+  clienteId  String?  @map("cliente_id") @db.Uuid
+  pedidoId   String?  @map("pedido_id") @db.Uuid
+  reservaId  String?  @map("reserva_id") @db.Uuid
+  /// 1 a 5 (CHECK en la migración)
+  puntaje    Int      @db.SmallInt
+  comentario String?  @db.VarChar(500)
+  creadoEn   DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  sede    Sede     @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  pedido  Pedido?  @relation(fields: [pedidoId], references: [id], onDelete: SetNull)
+  reserva Reserva? @relation(fields: [reservaId], references: [id], onDelete: SetNull)
+
+  @@index([sedeId, creadoEn])
+  @@map("calificaciones")
+}
+
+// ────────────────────────────── Marca ───────────────────────────────
+
+/// Apariencia de la aplicación (fila única, id = 1): nombre, logo y colores que elige el admin global.
+model Marca {
+  id              Int      @id @default(1)
+  nombre          String   @default("Fogón") @db.VarChar(40)
+  /// Logo como data URL (PNG, JPEG o WebP), reducido en el navegador a 320 px como máximo
+  logo            String?
+  /// Color de botones y acciones (texto blanco encima)
+  colorPrimario   String   @default("#D62828") @map("color_primario") @db.Char(7)
+  /// Color de énfasis: promociones, insignias, número listo (texto oscuro encima)
+  colorAcento     String   @default("#FFB703") @map("color_acento") @db.Char(7)
+  actualizadoEn   DateTime @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+  actualizadoPor  String?  @map("actualizado_por") @db.Uuid
+
+  @@map("marca")
+}
+
+/// Funciones que el admin global activa o desactiva para toda la cadena (fila única, id = 1).
+model Configuracion {
+  id                  Int      @id @default(1)
+  /// Reservas de mesa desde el portal. Apagado: las vistas de reservar no se muestran y la API no acepta reservas nuevas
+  reservasHabilitadas Boolean  @default(false) @map("reservas_habilitadas")
+  /// Botón "Ya no voy a esperar" en el turno de la fila
+  salirFilaHabilitado Boolean  @default(true) @map("salir_fila_habilitado")
+  actualizadoEn       DateTime @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+  actualizadoPor      String?  @map("actualizado_por") @db.Uuid
+
+  @@map("configuracion")
+}

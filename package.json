@@ -1,0 +1,46 @@
+{
+  "name": "restaurantes-multisede",
+  "version": "0.6.2",
+  "private": true,
+  "description": "Sistema multi-sede de menús, pedidos, reservas y gestión administrativa para cadenas de restaurantes",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run migrate -w @restaurantes/api",
+    "db:seed": "npm run seed -w @restaurantes/api",
+    "db:reset": "npm run reset -w @restaurantes/api",
+    "db:studio": "npm run studio -w @restaurantes/api",
+    "build:shared": "npm run build -w @restaurantes/shared",
+    "dev": "npm run build:shared && concurrently -k -n api,web -c red,yellow \"npm run dev -w @restaurantes/api\" \"npm run dev -w @restaurantes/web\"",
+    "build": "npm run build:shared && npm run build -w @restaurantes/api && npm run build -w @restaurantes/web",
+    "test": "npm run build:shared && npm run test -w @restaurantes/api",
+    "typecheck": "npm run build:shared && npm run typecheck -w @restaurantes/api && npm run typecheck -w @restaurantes/web",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "dev:api": "npm run build:shared && npm run dev -w @restaurantes/api",
+    "dev:web": "npm run dev -w @restaurantes/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^9.2.5",
+    "eslint": "^10.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "overrides": {
+    "vite": "^6.4.5",
+    "minimatch": "^11.0.3",
+    "@prisma/config": {
+      "deepmerge-ts": "^8.0.2",
+      "effect": "^3.22.4"
+    }
+  }
+}

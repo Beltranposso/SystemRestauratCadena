@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+package-lock.json
+apps/api/prisma/migrations
+# Tablas de datos de referencia: se mantienen en una línea por registro
+apps/api/prisma/seed/datos.ts

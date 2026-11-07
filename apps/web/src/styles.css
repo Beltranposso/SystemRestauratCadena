@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Valores por defecto (Fogón); lib/marca.ts los reemplaza con los de la cadena */
+  :root {
+    --marca-primario: 214 40 40;
+    --marca-primario-oscuro: 167 31 31;
+    --marca-acento: 255 183 3;
+    --marca-acento-suave: 255 228 159;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-canvas font-sans text-[15px] leading-normal text-ink antialiased;
+  }
+  :focus-visible {
+    outline: 3px solid rgb(var(--marca-acento));
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display font-bold tracking-tight;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Cifras grandes y números de pedido: Archivo condensada, dígitos tabulares */
+  .cifra {
+    font-family: theme('fontFamily.display');
+    font-variant-numeric: tabular-nums;
+    font-variation-settings: 'wdth' 75;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  .cifra-ancha {
+    font-family: theme('fontFamily.display');
+    font-variant-numeric: tabular-nums;
+    font-variation-settings: 'wdth' 112;
+    font-weight: 800;
+  }
+
+  /* Comanda: el borde inferior dentado imita el ticket de la impresora de cocina */
+  .comanda {
+    @apply relative bg-white;
+    --diente: 7px;
+    padding-bottom: calc(var(--diente) + 0.75rem);
+    -webkit-mask:
+      linear-gradient(#000 0 0) top / 100% calc(100% - var(--diente)) no-repeat,
+      conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--diente) * 2) var(--diente) repeat-x;
+    mask:
+      linear-gradient(#000 0 0) top / 100% calc(100% - var(--diente)) no-repeat,
+      conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--diente) * 2) var(--diente) repeat-x;
+  }
+
+  .campo {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-ink placeholder:text-ink-muted/70 focus:border-ink focus:outline-none;
+  }
+}
