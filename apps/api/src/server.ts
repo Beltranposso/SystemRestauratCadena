@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { env } from './config/env';
 import { logger } from './config/logger';
 import { prisma } from './db/prisma';
-import { crearApp } from './app';
+import { crearApp } from './crear-app';
 import { cerrarSocket, iniciarSocket } from './realtime/socket';
 
 const app = crearApp();

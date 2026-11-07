@@ -16,6 +16,14 @@ function crearCliente() {
   });
 }
 
+// Vercel solo empaqueta los archivos que encuentra referenciados en el código. Prisma carga su
+// motor (WebAssembly) en tiempo de ejecución, así que se nombra aquí para que no quede fuera.
+try {
+  require.resolve('.prisma/client/query_compiler_bg.wasm');
+} catch {
+  /* fuera de Vercel no importa */
+}
+
 // En desarrollo, `tsx watch` recarga módulos: se reutiliza la instancia para no abrir conexiones de más.
 const globalParaPrisma = globalThis as unknown as { prisma?: ReturnType<typeof crearCliente> };
 

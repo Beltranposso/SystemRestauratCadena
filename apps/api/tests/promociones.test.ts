@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { aplicarPromociones, promocionVigente, type ReglaPromocion } from '@restaurantes/shared';
-import { crearApp } from '../src/app';
+import { crearApp } from '../src/crear-app';
 import { prisma } from '../src/db/prisma';
 import { como, comoDispositivo, crearEscenario, tokenPersonal, type Escenario } from './escenario';
 
