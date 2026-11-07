@@ -223,6 +223,31 @@ Los nombres de salas y eventos están en `packages/shared/src/eventos.ts`.
 
 El seed usa una semilla fija (`SEED_SEMILLA`), así que genera siempre la misma estructura; las fechas se calculan desde el momento en que se ejecuta. Para un seed más rápido: `SEED_DIAS_PEDIDOS=30 npm run db:seed`.
 
+## Despliegue en Vercel
+
+El repo se despliega como **un solo proyecto de Vercel con dos services** (`vercel.json` en la raíz):
+
+| Service | Carpeta | Rutas públicas |
+| --- | --- | --- |
+| `api` (Express) | `apps/api` | `/api/*` y `/socket.io/*` |
+| `web` (Vite) | `apps/web` | Todo lo demás (con fallback a `index.html` para React Router) |
+
+Web y API comparten dominio, así que no hace falta CORS ni `VITE_API_URL`. No hay bindings: ningún servidor llama a otro, el navegador llama a `/api`.
+
+**Antes del primer deploy:**
+
+1. **PostgreSQL en la nube** (Neon, Supabase…). Aplica las migraciones y, si quieres datos de demo, el seed, desde tu equipo:
+   ```bash
+   cd apps/api
+   DATABASE_URL="postgresql://…" npx prisma migrate deploy
+   DATABASE_URL="postgresql://…" npm run seed   # opcional
+   ```
+2. **Redis** (Upstash desde el Marketplace de Vercel). Cada conexión de Socket.IO queda fija a una instancia; con Redis, un pedido cobrado en una instancia llega a la cocina conectada a otra.
+3. **Vercel Blob** (Storage → Blob → conectar al proyecto). Vercel no guarda archivos en disco, así que las fotos de productos se suben a Blob.
+4. **Variables de entorno** del proyecto: `NODE_ENV=production`, `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CORS_ORIGIN` (la URL del proyecto, p. ej. `https://tu-proyecto.vercel.app`), `REDIS_URL` (la URL `rediss://…` de tu base de Upstash; si la integración la creó con otro nombre, cópiala a `REDIS_URL`) y `BLOB_READ_WRITE_TOKEN` (la crea Vercel al conectar Blob).
+
+Sin `REDIS_URL` ni `BLOB_READ_WRITE_TOKEN` todo funciona como antes en local (eventos en memoria y fotos en `UPLOADS_DIR`). Para probar los dos services juntos en local: `vercel dev`.
+
 ## Scripts
 
 | Script | Qué hace |

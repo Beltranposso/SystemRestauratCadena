@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { del, put } from '@vercel/blob';
 import { env } from '../config/env';
 import { HttpError } from './http-error';
 
 /**
- * Fotos subidas por el admin. Se guardan en disco (UPLOADS_DIR) y se sirven en /uploads.
- * Para producción con varios servidores, basta con reemplazar guardar/borrar por un
- * almacenamiento en la nube (S3, Cloudinary): el resto del sistema solo guarda la URL.
+ * Fotos subidas por el admin. Con BLOB_READ_WRITE_TOKEN (Vercel) se guardan en Vercel Blob y se
+ * guarda su URL pública; sin él, en disco (UPLOADS_DIR) y se sirven en /uploads.
+ * El resto del sistema solo guarda la URL, así que no le importa dónde quedó la foto.
  */
 export const DIR_UPLOADS = path.resolve(env.UPLOADS_DIR);
 export const MAX_IMAGEN_BYTES = 2 * 1024 * 1024;
@@ -43,6 +44,17 @@ export async function guardarImagen(carpeta: string, prefijo: string, datos: unk
     throw new HttpError(415, 'IMAGEN_INVALIDA', 'El archivo no es una imagen WebP, PNG o JPG');
   const hash = createHash('sha256').update(datos).digest('hex').slice(0, 12);
   const nombre = `${prefijo}-${hash}.${ext}`;
+  if (env.BLOB_READ_WRITE_TOKEN) {
+    const blob = await put(`${carpeta}/${nombre}`, datos, {
+      access: 'public',
+      addRandomSuffix: false,
+      allowOverwrite: true, // mismo hash = mismo contenido
+      contentType: ext === 'jpg' ? 'image/jpeg' : `image/${ext}`,
+      cacheControlMaxAge: 365 * 24 * 60 * 60,
+      token: env.BLOB_READ_WRITE_TOKEN,
+    });
+    return blob.url;
+  }
   await mkdir(path.join(DIR_UPLOADS, carpeta), { recursive: true });
   await writeFile(path.join(DIR_UPLOADS, carpeta, nombre), datos);
   return `/uploads/${carpeta}/${nombre}`;
@@ -50,8 +62,20 @@ export async function guardarImagen(carpeta: string, prefijo: string, datos: unk
 
 /** Borra una imagen subida antes (ignora URLs externas o que ya no existan). */
 export async function borrarImagen(url: string | null | undefined) {
+  if (env.BLOB_READ_WRITE_TOKEN && url && esUrlBlob(url)) {
+    await del(url, { token: env.BLOB_READ_WRITE_TOKEN }).catch(() => undefined);
+    return;
+  }
   if (!url?.startsWith('/uploads/')) return;
   const ruta = path.resolve(DIR_UPLOADS, url.slice('/uploads/'.length));
   if (!ruta.startsWith(DIR_UPLOADS + path.sep)) return; // nunca fuera de la carpeta
   await unlink(ruta).catch(() => undefined);
+}
+
+function esUrlBlob(url: string) {
+  try {
+    return new URL(url).hostname.endsWith('.blob.vercel-storage.com');
+  } catch {
+    return false;
+  }
 }

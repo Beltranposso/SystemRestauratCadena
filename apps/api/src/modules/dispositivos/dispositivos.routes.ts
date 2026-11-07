@@ -87,9 +87,9 @@ const camposDispositivo = {
   ultimaConexionEn: true,
 } as const;
 
-const conPresencia = <T extends { id: string }>(d: T) => ({
+const conPresencia = <T extends { id: string }>(d: T, enLinea: ReadonlySet<string>) => ({
   ...d,
-  enLinea: dispositivosEnLinea().has(d.id),
+  enLinea: enLinea.has(d.id),
 });
 
 async function dispositivoEnAlcance(auth: Parameters<typeof asegurarSede>[0], id: string) {
@@ -135,7 +135,7 @@ ruta(
         select: { id: true, sedeId: true },
       }),
     ]);
-    const enLinea = dispositivosEnLinea();
+    const enLinea = await dispositivosEnLinea();
     return info.map((s) => ({
       ...s,
       cupos: cupos.get(s.id)!,
@@ -203,15 +203,19 @@ ruta(
   },
   async ({ auth, params }) => {
     await asegurarSede(auth, params.sedeId);
-    const [cupos, dispositivos] = await Promise.all([
+    const [cupos, dispositivos, enLinea] = await Promise.all([
       cuposDe([params.sedeId]),
       prisma.dispositivo.findMany({
         where: { sedeId: params.sedeId },
         select: camposDispositivo,
         orderBy: [{ tipo: 'asc' }, { creadoEn: 'asc' }],
       }),
+      dispositivosEnLinea(),
     ]);
-    return { cupos: cupos.get(params.sedeId)!, dispositivos: dispositivos.map(conPresencia) };
+    return {
+      cupos: cupos.get(params.sedeId)!,
+      dispositivos: dispositivos.map((d) => conPresencia(d, enLinea)),
+    };
   },
 );
 
@@ -241,7 +245,7 @@ ruta(
         select: camposDispositivo,
       });
     });
-    return { ...conPresencia(d), token };
+    return { ...conPresencia(d, await dispositivosEnLinea()), token };
   },
 );
 
@@ -272,7 +276,7 @@ ruta(
     });
     invalidarCacheDispositivos();
     if (body.activo === false) desconectarDispositivo(d.id);
-    return conPresencia(actualizado);
+    return conPresencia(actualizado, await dispositivosEnLinea());
   },
 );
 
@@ -296,7 +300,7 @@ ruta(
     });
     invalidarCacheDispositivos();
     desconectarDispositivo(d.id);
-    return { ...conPresencia(actualizado), token };
+    return { ...conPresencia(actualizado, await dispositivosEnLinea()), token };
   },
 );
 

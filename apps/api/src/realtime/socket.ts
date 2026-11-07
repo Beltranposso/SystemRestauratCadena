@@ -1,5 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server, type Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { createClient } from 'redis';
 import { z } from 'zod';
 import { CANALES_SEDE, EVENTOS, SALAS, type CanalSede } from '@restaurantes/shared';
 import { env } from '../config/env';
@@ -10,12 +12,44 @@ import { obtenerSede, puedeVerSede } from '../auth/alcance';
 import type { Auth } from '../auth/tipos';
 
 let io: Server | undefined;
+let clientesRedis: { quit(): Promise<unknown> }[] = [];
 
-/** Pantallas y kioscos con al menos una conexión abierta ahora (id → nº de sockets). */
-const conectados = new Map<string, number>();
+/** Sala con todos los sockets de pantallas y kioscos, y sala propia de cada equipo. */
+const SALA_DISPOSITIVOS = 'dispositivos';
+const salaDispositivo = (id: string) => `dispositivo:${id}`;
 
-export function dispositivosEnLinea(): ReadonlySet<string> {
-  return new Set(conectados.keys());
+/**
+ * Pantallas y kioscos con al menos una conexión abierta ahora. Consulta las salas en vez de un
+ * mapa en memoria para que funcione igual con varias instancias (adaptador de Redis).
+ */
+export async function dispositivosEnLinea(): Promise<ReadonlySet<string>> {
+  if (!io) return new Set();
+  try {
+    const sockets = await io.in(SALA_DISPOSITIVOS).fetchSockets();
+    const ids = new Set<string>();
+    for (const s of sockets) {
+      const a = s.data.auth as Auth | undefined;
+      if (a?.tipo === 'dispositivo') ids.add(a.id);
+    }
+    return ids;
+  } catch (err) {
+    logger.warn({ err }, 'No se pudo consultar qué equipos están en línea');
+    return new Set();
+  }
+}
+
+/**
+ * Con REDIS_URL, los eventos emitidos en una instancia llegan a los sockets conectados a
+ * cualquier otra (necesario en Vercel, donde cada conexión queda fija a una instancia).
+ */
+async function conectarRedis(servidorIo: Server, url: string) {
+  const pub = createClient({ url });
+  const sub = pub.duplicate();
+  for (const c of [pub, sub]) c.on('error', (err) => logger.error({ err }, 'Error de Redis'));
+  clientesRedis = [pub, sub];
+  await Promise.all([pub.connect(), sub.connect()]);
+  servidorIo.adapter(createAdapter(pub, sub));
+  logger.info('Socket.IO usando el adaptador de Redis');
 }
 
 function marcarConexion(dispositivoId: string) {
@@ -61,6 +95,15 @@ export function iniciarSocket(servidor: HttpServer): Server {
     connectionStateRecovery: { maxDisconnectionDuration: 2 * 60 * 1000 },
   });
 
+  if (env.REDIS_URL) {
+    conectarRedis(io, env.REDIS_URL).catch((err) =>
+      logger.error(
+        { err },
+        'No se pudo conectar a Redis: los eventos solo llegarán a esta instancia',
+      ),
+    );
+  }
+
   io.use(async (socket, next) => {
     const { token, deviceToken } = (socket.handshake.auth ?? {}) as Record<string, unknown>;
     try {
@@ -81,14 +124,9 @@ export function iniciarSocket(servidor: HttpServer): Server {
     const auth = socket.data.auth as Auth | undefined;
     if (auth?.tipo === 'cliente') void socket.join(SALAS.cliente(auth.id));
     if (auth?.tipo === 'dispositivo') {
-      conectados.set(auth.id, (conectados.get(auth.id) ?? 0) + 1);
+      void socket.join([SALA_DISPOSITIVOS, salaDispositivo(auth.id)]);
       marcarConexion(auth.id);
-      socket.on('disconnect', () => {
-        const n = (conectados.get(auth.id) ?? 1) - 1;
-        if (n <= 0) conectados.delete(auth.id);
-        else conectados.set(auth.id, n);
-        marcarConexion(auth.id);
-      });
+      socket.on('disconnect', () => marcarConexion(auth.id));
     }
     logger.debug({ socket: socket.id, tipo: auth?.tipo ?? 'anonimo' }, 'Socket conectado');
 
@@ -142,19 +180,22 @@ export function emitirATodos(evento: string, datos: unknown) {
   io?.emit(evento, datos);
 }
 
-/** Corta las conexiones de un dispositivo (al desactivarlo o cambiar su token). */
+/**
+ * Corta las conexiones de un dispositivo (al desactivarlo o cambiar su token), esté conectado
+ * a esta instancia o a otra.
+ */
 export function desconectarDispositivo(dispositivoId: string) {
   if (!io) return;
-  for (const s of io.sockets.sockets.values()) {
-    const a = s.data.auth as Auth | undefined;
-    if (a?.tipo === 'dispositivo' && a.id === dispositivoId) {
-      s.emit(EVENTOS.dispositivoRevocado, { motivo: 'El administrador desactivó este equipo' });
-      s.disconnect(true);
-    }
-  }
+  const sala = salaDispositivo(dispositivoId);
+  io.to(sala).emit(EVENTOS.dispositivoRevocado, {
+    motivo: 'El administrador desactivó este equipo',
+  });
+  io.in(sala).disconnectSockets(true);
 }
 
 export async function cerrarSocket(): Promise<void> {
   if (io) await io.close();
   io = undefined;
+  await Promise.all(clientesRedis.map((c) => c.quit().catch(() => undefined)));
+  clientesRedis = [];
 }
