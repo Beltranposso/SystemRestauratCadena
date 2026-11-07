@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { crearApp } from '../src/app';
+import { crearApp } from '../src/crear-app';
 import { prisma } from '../src/db/prisma';
 import {
   PASSWORD,

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { io as socketCliente } from 'socket.io-client';
 import { EVENTOS } from '@restaurantes/shared';
-import { crearApp } from '../src/app';
+import { crearApp } from '../src/crear-app';
 import { prisma } from '../src/db/prisma';
 import { cerrarSocket, iniciarSocket } from '../src/realtime/socket';
 import {

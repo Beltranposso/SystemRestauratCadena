@@ -8,7 +8,7 @@ import {
   rgbAHex,
   sugerirPaletas,
 } from '@restaurantes/shared';
-import { crearApp } from '../src/app';
+import { crearApp } from '../src/crear-app';
 import { prisma } from '../src/db/prisma';
 import { como, crearEscenario, tokenPersonal, type Escenario } from './escenario';
 

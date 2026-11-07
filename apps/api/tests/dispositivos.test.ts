@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { crearApp } from '../src/app';
+import { crearApp } from '../src/crear-app';
 import { prisma } from '../src/db/prisma';
 import { como, comoDispositivo, crearEscenario, tokenPersonal, type Escenario } from './escenario';
 

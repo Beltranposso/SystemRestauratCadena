@@ -2,7 +2,7 @@ import { existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { crearApp } from '../src/app';
+import { crearApp } from '../src/crear-app';
 import { prisma } from '../src/db/prisma';
 import { DIR_UPLOADS } from '../src/utils/imagenes';
 import { como, crearEscenario, tokenPersonal, type Escenario } from './escenario';

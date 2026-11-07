@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as socketCliente, type Socket } from 'socket.io-client';
 import { EVENTOS } from '@restaurantes/shared';
-import { crearApp } from '../src/app';
+import { crearApp } from '../src/crear-app';
 import { prisma } from '../src/db/prisma';
 import { cerrarSocket, iniciarSocket } from '../src/realtime/socket';
 import { como, comoDispositivo, crearEscenario, tokenPersonal, type Escenario } from './escenario';
