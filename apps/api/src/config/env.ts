@@ -24,6 +24,13 @@ const esquemaEnv = z.object({
     ),
   /** Carpeta donde se guardan las fotos de productos (relativa a apps/api o absoluta) */
   UPLOADS_DIR: z.string().default('uploads'),
+  /**
+   * Redis para Socket.IO con varias instancias (Vercel, varios servidores). Sin él, los eventos
+   * solo llegan a los clientes conectados a la misma instancia (suficiente en local).
+   */
+  REDIS_URL: z.string().url().optional(),
+  /** Token de Vercel Blob: si existe, las fotos se guardan ahí en vez de en UPLOADS_DIR. */
+  BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

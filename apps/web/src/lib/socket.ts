@@ -29,7 +29,8 @@ export function useTiempoReal(
     if (credencial.token) auth.token = credencial.token;
     if (credencial.deviceToken) auth.deviceToken = credencial.deviceToken;
 
-    const socket: Socket = io({ auth, transports: ['websocket', 'polling'] });
+    // Solo WebSocket: en Vercel el long-polling no funciona (cada petición puede caer en otra instancia)
+    const socket: Socket = io({ auth, transports: ['websocket'] });
     const unirse = () => {
       for (const s of JSON.parse(claveSalas) as Sala[]) {
         if ('entradaId' in s) socket.emit(EVENTOS.unirseEspera, s);
