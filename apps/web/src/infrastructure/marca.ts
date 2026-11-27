@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { MARCA_POR_DEFECTO, derivarPaleta, hexARgb } from '@restaurantes/shared';
+import { MARCA_POR_DEFECTO, derivarPaleta, hexARgb } from '@shared';
 import { useQuery } from '../application/consultas';
 import { establecerMarca } from '../application/store';
 import type { Marca } from '../domain/tipos';

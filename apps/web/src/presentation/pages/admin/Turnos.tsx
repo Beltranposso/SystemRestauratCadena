@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '../../../application/consultas';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import type { PuestoTurno } from '@restaurantes/shared';
+import type { PuestoTurno } from '@shared';
 import { SelectorSede } from '../../components/Filtros';
 import { Aviso, Boton, Campo, Cargando, cx, Modal } from '../../components/ui';
 import { useSedeTrabajo } from '../../hooks/consultas';

@@ -12,7 +12,7 @@ import {
   TINTA,
   type Rgb,
   type Sugerencia,
-} from '@restaurantes/shared';
+} from '@shared';
 import { Aviso, Boton, Campo, cx, Insignia } from '../../components/ui';
 import { aplicarMarca, useMarca, variablesDe, type Marca } from '../../../infrastructure/marca';
 import { apiPersonal, mensajeError } from '../../../application/sesion';

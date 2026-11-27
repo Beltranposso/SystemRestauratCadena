@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
-import type { RolUsuario } from '@restaurantes/shared';
+import type { RolUsuario } from '@shared';
 import { Boton, Cargando, Marca } from '../components/ui';
 import { cerrarSesionPersonal, renovarPersonal, useDispositivo, usePersonal } from '../../application/sesion';
 import { ETIQUETA_ROL } from '../utils/formato';

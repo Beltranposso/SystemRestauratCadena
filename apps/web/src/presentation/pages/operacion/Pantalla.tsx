@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '../../../application/consultas';
 import { Maximize } from 'lucide-react';
-import { EVENTOS } from '@restaurantes/shared';
+import { EVENTOS } from '@shared';
 import { cx, EnVivo, Marca } from '../../components/ui';
 import { apiDispositivo, useDispositivo } from '../../../application/sesion';
 import { sonar, useTiempoReal } from '../../../infrastructure/socket';

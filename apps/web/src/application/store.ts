@@ -1,7 +1,7 @@
 import { configureStore, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { Middleware } from 'redux';
 import { useDispatch, useSelector } from 'react-redux';
-import { MARCA_POR_DEFECTO } from '@restaurantes/shared';
+import { MARCA_POR_DEFECTO } from '@shared';
 import type { Cliente, Configuracion, Dispositivo, Marca, Usuario } from '../domain/tipos';
 import { apisRTK } from '../infrastructure/api';
 import { consultaApi } from '../infrastructure/consulta-api';

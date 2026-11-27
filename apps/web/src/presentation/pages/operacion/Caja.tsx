@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '../../../application/consultas';
 import { HandPlatter } from 'lucide-react';
-import { EVENTOS } from '@restaurantes/shared';
+import { EVENTOS } from '@shared';
 import { BarraOperacion } from '../../components/BarraOperacion';
 import { TomaPedido, type DatosPedido } from '../../components/TomaPedido';
 import { Boton, Cargando, Modal, Vacio } from '../../components/ui';

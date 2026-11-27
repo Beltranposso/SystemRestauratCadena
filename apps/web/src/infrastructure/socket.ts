@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { EVENTOS, type CanalSede } from '@restaurantes/shared';
+import { EVENTOS, type CanalSede } from '@shared';
 import { olvidarDispositivo } from '../application/store';
 import type { Configuracion } from '../domain/tipos';
 import { refrescarConfiguracion } from './configuracion';

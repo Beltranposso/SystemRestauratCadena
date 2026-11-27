@@ -6,7 +6,7 @@ import {
   TRANSICIONES_MESA,
   type EstadoMesa,
   type EstadoReserva,
-} from '@restaurantes/shared';
+} from '@shared';
 import { SelectorSede } from '../../components/Filtros';
 import { ESTILO_MESA, LeyendaMesas, MapaSalon, type Posiciones } from '../../components/MapaSalon';
 import {

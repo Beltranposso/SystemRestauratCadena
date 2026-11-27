@@ -9,9 +9,9 @@ const API = process.env.VITE_API_PROXY ?? 'http://localhost:4000';
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    // El paquete compartido se consume desde su código TypeScript (no hace falta compilarlo para la web)
+    // Código compartido de la propia app, sin paquetes ni compilación intermedia
     alias: {
-      '@restaurantes/shared': fileURLToPath(new URL('../../packages/shared/src/index.ts', import.meta.url)),
+      '@shared': fileURLToPath(new URL('./src/shared/index.ts', import.meta.url)),
     },
   },
   server: {

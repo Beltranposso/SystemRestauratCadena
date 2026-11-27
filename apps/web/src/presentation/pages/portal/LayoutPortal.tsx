@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { BellRing, X } from 'lucide-react';
-import { EVENTOS } from '@restaurantes/shared';
+import { EVENTOS } from '@shared';
 import { cx, Marca } from '../../components/ui';
 import { cerrarSesionCliente, renovarCliente, useCliente } from '../../../application/sesion';
 import { sonar, useTiempoReal } from '../../../infrastructure/socket';

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '../../../application/consultas';
 import { Link, useParams } from 'react-router-dom';
-import { EVENTOS } from '@restaurantes/shared';
+import { EVENTOS } from '@shared';
 import { useConfiguracion } from '../../../infrastructure/configuracion';
 import { Aviso, Boton, Cargando, cx, EnVivo } from '../../components/ui';
 import { apiPublica, mensajeError } from '../../../application/sesion';

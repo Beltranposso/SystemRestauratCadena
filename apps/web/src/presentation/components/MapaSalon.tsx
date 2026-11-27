@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type PointerEvent } from 'react';
 import { Users } from 'lucide-react';
-import type { EstadoMesa } from '@restaurantes/shared';
+import type { EstadoMesa } from '@shared';
 import type { Mesa } from '../../domain/tipos';
 import { cx } from './ui';
 

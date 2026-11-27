@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '../../../application/consultas';
 import { CalendarDays, Clock, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
-import { NOMBRES_DIAS, type TipoPromocion } from '@restaurantes/shared';
+import { NOMBRES_DIAS, type TipoPromocion } from '@shared';
 import {
   Aviso,
   Boton,

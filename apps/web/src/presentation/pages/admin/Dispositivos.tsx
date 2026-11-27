@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '../../../application/consultas';
 import { Copy, KeyRound, Minus, MonitorPlay, Plus, Power, Tablet, Trash2 } from 'lucide-react';
 import QRCode from 'qrcode';
-import type { TipoDispositivo } from '@restaurantes/shared';
+import type { TipoDispositivo } from '@shared';
 import { SelectorSede } from '../../components/Filtros';
 import { Aviso, Boton, Campo, Cargando, cx, Insignia, Modal } from '../../components/ui';
 import { useSedeTrabajo } from '../../hooks/consultas';

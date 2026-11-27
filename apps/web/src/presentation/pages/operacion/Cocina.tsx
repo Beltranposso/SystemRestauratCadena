@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '../../../application/consultas';
 import { Volume2, VolumeX } from 'lucide-react';
-import { EVENTOS, type EstadoPedido } from '@restaurantes/shared';
+import { EVENTOS, type EstadoPedido } from '@shared';
 import { BarraOperacion } from '../../components/BarraOperacion';
 import { Aviso, Boton, Cargando, cx } from '../../components/ui';
 import { useSedeTrabajo } from '../../hooks/consultas';

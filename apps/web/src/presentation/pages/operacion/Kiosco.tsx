@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '../../../application/consultas';
-import { EVENTOS } from '@restaurantes/shared';
+import { EVENTOS } from '@shared';
 import { TomaPedido, type DatosPedido } from '../../components/TomaPedido';
 import { Boton, Cargando, Marca } from '../../components/ui';
 import { dinero } from '../../utils/formato';

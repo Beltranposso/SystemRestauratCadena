@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Minus, Package, Plus, Tag, Trash2 } from 'lucide-react';
-import { aplicarPromociones, type MetodoPago } from '@restaurantes/shared';
+import { aplicarPromociones, type MetodoPago } from '@shared';
 import type { Menu, ProductoMenu } from '../../domain/tipos';
 import { dinero } from '../utils/formato';
 import { Aviso, Boton, cx, Segmentos } from './ui';

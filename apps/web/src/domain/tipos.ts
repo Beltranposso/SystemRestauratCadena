@@ -12,7 +12,7 @@ import type {
   RolUsuario,
   TipoDispositivo,
   TipoPromocion,
-} from '@restaurantes/shared';
+} from '@shared';
 
 /** Montos: la API los envía como texto decimal ("29600.00"). */
 export type Monto = string;

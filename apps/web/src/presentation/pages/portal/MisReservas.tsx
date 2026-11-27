@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '../../../application/consultas';
 import { Link, Navigate } from 'react-router-dom';
 import { QrCode, Star } from 'lucide-react';
-import type { EstadoReserva } from '@restaurantes/shared';
+import type { EstadoReserva } from '@shared';
 import { ComprobanteReserva } from '../../components/ComprobanteReserva';
 import { SelectorFranja } from '../../components/SelectorFranja';
 import { Aviso, Boton, Cargando, cx, Insignia, Modal, Vacio } from '../../components/ui';
