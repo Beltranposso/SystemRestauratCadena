@@ -22,8 +22,8 @@
     ],
     "noEmit": true,
     "paths": {
-      "@restaurantes/shared": [
-        "../../packages/shared/src/index.ts"
+      "@shared": [
+        "./src/shared/index.ts"
       ]
     }
   },

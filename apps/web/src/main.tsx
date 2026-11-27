@@ -1,29 +1,24 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Provider } from 'react-redux';
 import { RouterProvider } from 'react-router-dom';
-import { enrutador } from './app/rutas';
-import { SincronizarMarca, aplicarMarcaGuardada } from './lib/marca';
-import { SincronizarConfiguracion } from './lib/configuracion';
+import { store } from './application/store';
+import { enrutador } from './presentation/app/rutas';
+import { SincronizarMarca, aplicarMarcaGuardada } from './infrastructure/marca';
+import { SincronizarConfiguracion } from './infrastructure/configuracion';
 // Fuentes alojadas con la app: el kiosco y la pantalla funcionan aunque no haya salida a Google Fonts
 import '@fontsource-variable/archivo/wdth.css';
 import '@fontsource-variable/figtree';
-import './styles.css';
-
-const clienteConsultas = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 15_000 },
-  },
-});
+import './presentation/styles.css';
 
 aplicarMarcaGuardada();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={clienteConsultas}>
+    <Provider store={store}>
       <SincronizarMarca />
       <SincronizarConfiguracion />
       <RouterProvider router={enrutador} />
-    </QueryClientProvider>
+    </Provider>
   </StrictMode>,
 );
