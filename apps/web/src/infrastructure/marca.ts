@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { MARCA_POR_DEFECTO, derivarPaleta, hexARgb } from '@shared';
+import { MARCA_POR_DEFECTO, derivarPaleta, esHex, hexARgb } from '@shared';
 import { useQuery } from '../application/consultas';
 import { establecerMarca } from '../application/store';
 import type { Marca } from '../domain/tipos';
@@ -11,6 +11,29 @@ export { marcaActual, useMarca } from '../application/hooks';
 export type { Marca } from '../domain/tipos';
 
 export const MARCA_INICIAL: Marca = { ...MARCA_POR_DEFECTO, logo: null };
+
+/**
+ * La respuesta de la API (o un localStorage antiguo) puede no traer colores válidos.
+ * Nunca dejamos que eso llegue a `derivarPaleta`, que espera hex de 6 dígitos.
+ */
+export function normalizarMarca(datos: unknown): Marca {
+  if (typeof datos !== 'object' || datos === null) return MARCA_INICIAL;
+  const m = datos as Partial<Marca>;
+  return {
+    ...MARCA_INICIAL,
+    ...m,
+    nombre: typeof m.nombre === 'string' && m.nombre.trim() ? m.nombre : MARCA_INICIAL.nombre,
+    colorPrimario:
+      typeof m.colorPrimario === 'string' && esHex(m.colorPrimario)
+        ? m.colorPrimario
+        : MARCA_INICIAL.colorPrimario,
+    colorAcento:
+      typeof m.colorAcento === 'string' && esHex(m.colorAcento)
+        ? m.colorAcento
+        : MARCA_INICIAL.colorAcento,
+    logo: typeof m.logo === 'string' ? m.logo : null,
+  };
+}
 
 /** Variables CSS de un par de colores (las mismas que usa Tailwind: brand.red, brand.gold…). */
 export function variablesDe(colorPrimario: string, colorAcento: string): Record<string, string> {
@@ -25,7 +48,8 @@ export function variablesDe(colorPrimario: string, colorAcento: string): Record<
 }
 
 /** Pinta toda la app con la marca y la guarda en el store y en localStorage. */
-export function aplicarMarca(m: Marca) {
+export function aplicarMarca(datos: unknown) {
+  const m = normalizarMarca(datos);
   const raiz = document.documentElement;
   for (const [clave, valor] of Object.entries(variablesDe(m.colorPrimario, m.colorAcento)))
     raiz.style.setProperty(clave, valor);
@@ -37,7 +61,7 @@ export function aplicarMarca(m: Marca) {
 
 /** Al arrancar: aplica la última marca conocida para que no parpadee el rojo por defecto. */
 export function aplicarMarcaGuardada() {
-  aplicarMarca(leer<Marca>(CLAVES.marca, MARCA_INICIAL));
+  aplicarMarca(leer<unknown>(CLAVES.marca, MARCA_INICIAL));
 }
 
 /** Mantiene la marca al día con el servidor (también en kioscos y pantallas sin sesión). */
@@ -49,7 +73,7 @@ export function SincronizarMarca() {
     staleTime: 60_000,
   });
   useEffect(() => {
-    if (marca.data) aplicarMarca(marca.data);
+    if (marca.data && typeof marca.data === 'object') aplicarMarca(marca.data);
   }, [marca.data]);
   return null;
 }

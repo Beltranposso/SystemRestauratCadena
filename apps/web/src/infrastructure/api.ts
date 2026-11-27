@@ -122,6 +122,11 @@ function crearBaseQuery(contexto: Contexto): Base {
         }
       }
 
+      const tipoContenido = respuesta.headers.get('content-type') ?? '';
+      const esHtml =
+        /text\/html/i.test(tipoContenido) ||
+        (typeof datos === 'string' && datos.trimStart().startsWith('<'));
+
       if (!respuesta.ok) {
         const error: ErrorApi = {
           status: respuesta.status,
@@ -149,6 +154,16 @@ function crearBaseQuery(contexto: Contexto): Base {
           if (tokenNuevo) return ejecutar(true);
         }
         return { error };
+      }
+      if (esHtml) {
+        return {
+          error: {
+            status: respuesta.status,
+            code: 'RESPUESTA_NO_JSON',
+            message: 'La API devolvió HTML en lugar de JSON. Revisa VITE_API_URL.',
+            data: typeof datos === 'string' ? datos.slice(0, 200) : undefined,
+          },
+        };
       }
       return { data: datos };
     };
