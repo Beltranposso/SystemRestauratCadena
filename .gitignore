@@ -1,8 +1,34 @@
+# Dependencias, builds y cachés
 node_modules/
 dist/
+build/
+out/
 coverage/
+*.tsbuildinfo
+
+# Variables de entorno (si aparece .env.example, ese sí se versiona)
 .env
+.env.*
+!.env.example
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Sistema operativo y editor
 .DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Salesforce CLI
+.sf/
+
+# Archivos locales / legado
 uploads/
-apps/api/tests/.uploads/
